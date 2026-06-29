@@ -20,7 +20,7 @@ const char* parseErrStrings[PARSE_ERROR_UBOUND] = {
 	"Invalid argument format",			//PARSE_ERROR_INVALID_FORMAT
 	"Duplicated value",					//PARSE_ERROR_DUPLICATE_VALUE
 	"Unknown argument",					//PARSE_ERROR_UNKNOWN
-	"Invalid value for argument",		//PARSE_ERROR_INVALID_VALUE
+	"Value verification failed",		//PARSE_ERROR_INVALID_VALUE
 	"Missing mandatory argument",		//PARSE_ERROR_MISSING
 };
 
@@ -32,17 +32,17 @@ ParseResult parse_arguments(int argc, char *argv[], const int paramc, tCmdOption
 
     int i = 1;
     while ((i < argc) && (result == PARSE_SUCCESS)) {
-    	log_message(LOG_DEBUG, "Processing argument: %s", argv[i]);
+        log_message(LOG_DEBUG, "Processing argument: %s", argv[i]);
         // Create a writable copy of the current argument
         char *arg_copy = strdup(argv[i]);
         if (!arg_copy) {
-        	log_message(LOG_ERROR, "Memory allocation failed for argument %s", argv[i]);
+            log_message(LOG_ERROR, "Memory allocation failed for argument %s", argv[i]);
             result = PARSE_ERROR_MEMORY;
         } else {
             // Find the '=' character in the argument
             char *equals = strchr(arg_copy, '=');
             if (!equals || equals == arg_copy) {
-            	log_message(LOG_WARNING, "Invalid argument format: %s", argv[i]);
+                log_message(LOG_WARNING, "Invalid argument format: %s", argv[i]);
                 result = PARSE_ERROR_INVALID_FORMAT;
             } else {
                 // Split the argument into key and value
@@ -58,29 +58,29 @@ ParseResult parse_arguments(int argc, char *argv[], const int paramc, tCmdOption
                 do {
                     if (strcmp(key, params[j].option) == 0) {
                         found = 1;
-
                         if (params[j].was_passed) {
-                        	log_message(LOG_WARNING, "Duplicate argument detected: %s", key);
+                            log_message(LOG_WARNING, "Duplicate argument detected: %s", key);
                             result = PARSE_ERROR_DUPLICATE_VALUE;
                         } else {
                             if (params[j].validate && !params[j].validate(value)) {
-                            	log_message(LOG_WARNING, "Invalid value for %s: %s", key, value);
+                                log_message(LOG_WARNING, "Invalid value for %s: %s", key, value);
                                 result = PARSE_ERROR_INVALID_VALUE;
                             } else {
-                                if (result == PARSE_SUCCESS) {
+                                //if (result == PARSE_SUCCESS) {
                                     strncpy(params[j].value, value, sizeof(params[j].value) - 1);
                                     params[j].value[sizeof(params[j].value) - 1] = '\0';
                                     params[j].was_passed = 1;
-                                	log_message(LOG_DEBUG, "Processed key %s: value:%s assigned to params[%d]", key, value, j);
-                                }
+                                    log_message(LOG_DEBUG, "Processed key %s: value:%s assigned to params[%d]", key, value, j);
+                                //}
                             }
                         }
                     }
                     j++;
-                } while ((j < paramc) && (!found || result != PARSE_SUCCESS));
+                //} while ((j < paramc) && (!found || result != PARSE_SUCCESS));
+                } while ((j < paramc) && (!found) && (result == PARSE_SUCCESS));
 
                 if (!found) {
-                	log_message(LOG_WARNING, "Unknown argument: %s", key);
+                    log_message(LOG_WARNING, "Unknown argument: %s", key);
                     result = PARSE_ERROR_UNKNOWN;
                 }
             }
@@ -94,9 +94,9 @@ ParseResult parse_arguments(int argc, char *argv[], const int paramc, tCmdOption
     log_message(LOG_DEBUG, "Arguments loop done.");
 
     // Check for missing mandatory parameters
-    for (int j = 0; j < paramc; j++) {
+    for (int j = 0; (j < paramc) && (result == PARSE_SUCCESS) ; j++) {
         if (params[j].mandatory && !params[j].was_passed) {
-        	log_message(LOG_WARNING, "Missing mandatory argument: %s", params[j].usage_info);
+            log_message(LOG_WARNING, "Missing mandatory argument: %s", params[j].usage_info);
             result = PARSE_ERROR_MISSING;
         }
     }
@@ -131,8 +131,12 @@ int getParamValueByIndex(int paramIndex, const int paramc, const tCmdOptionParam
           strncpy(paramVal, params[paramIndex].value,  sizeof(params[paramIndex].value) - 1);
           result = 0;
         } else {
-          strncpy(paramVal, params[paramIndex].default_value,  PARAM_MAX_LENGTH - 1);
-          result = 0;
+          if (params[paramIndex].default_value != NULL) {
+            strncpy(paramVal, params[paramIndex].default_value,  PARAM_MAX_LENGTH - 1);
+            result = 0;
+          } else {
+            log_message(LOG_WARNING, "getParamValueByIndex: Can't return default_value for ParamIndex:%d as it is NULL.", paramIndex);
+          }
         }
     }
 
